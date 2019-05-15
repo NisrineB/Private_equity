@@ -1,0 +1,103 @@
+import pandas as pd 
+import numpy as np 
+from matplotlib import pyplot as plt 
+from sklearn.preprocessing import MinMaxScaler
+import datetime
+
+
+
+# Import des datasets 
+#rating = pd.read_excel("/Users/nisrinebarkallah/Dropbox/Grand Oral_project/Rating_pays.xlsx",error_bad_lines=False)
+#beta = pd.read_excel("/Users/nisrinebarkallah/Dropbox/Grand Oral_project/betas.xls")
+comp_1 = pd.read_excel("/Users/nisrinebarkallah/Dropbox/Grand Oral_project/Export_1.xlsx")
+comp_2 = pd.read_excel("/Users/nisrinebarkallah/Dropbox/Grand Oral_project/Export 02_05_2019 18_01 1.xlsx")
+
+# Création du dataset 
+df = comp_1.append(comp_2)
+
+# Preprocessing
+c = df.isnull().sum(axis=0)
+
+df = df.convert_objects(convert_numeric=True)
+df.dtypes
+
+df = df.drop(["Branch","Woco","Effectifs\nDernière année disp.", "OwnData", 
+              "NACE Rev. 2 Code principal","Code ISO Pays", "Listing status", 
+              "Code de consolidation"],axis=1)
+
+df = df[np.isfinite(df['Dernière année disp.'])]
+
+#for col in ['NACE Rev. 2 Code principal']:
+#    df[col] = df[col].astype('category')
+
+
+# Drop observation >50% 
+df["nul_value"] = df.isnull().sum(axis=1)
+df = df[df.nul_value < 9]
+df = df.drop(["nul_value"], axis=1)
+
+# Dealing with missing value  
+
+df.isnull().sum(axis=0)
+colums = list(df.columns)
+
+sales = df.iloc[:,4:14]
+ebit = df.iloc[:,14:24]
+net_income = df.iloc[:,24:34]
+ROE = df.iloc[:,34:44]
+ROIC = df.iloc[:,44:54]
+ROA = df.iloc[:,54:64]
+Eq = df.iloc[:,64:74]
+
+
+# Imputation with mean 
+
+sales.fillna(sales.mean(), inplace=True)
+ebit.fillna(ebit.mean(), inplace=True)
+net_income.fillna(net_income.mean(), inplace=True)
+ROE.fillna(ROE.mean(), inplace=True)
+ROIC.fillna(ROIC.mean(), inplace=True)
+ROA.fillna(ROA.mean(), inplace=True)
+Eq.fillna(Eq.mean(), inplace=True)
+
+data = pd.concat([df.iloc[:,0:4],sales,ebit, net_income, ROE, ROIC, ROA, Eq], 
+                 axis=1 )
+
+#==============================================================================
+# Times Series 
+#==============================================================================
+
+from  statsmodels.tsa.statespace.sarimax import SARIMAX
+from sklearn.preprocessing import StandardScaler 
+from fbprophet import Prophet
+
+
+sales = data.iloc[:,4:14].transpose()
+ebit = data.iloc[:,14:24].transpose()
+net_income = data.iloc[:,24:34].transpose()
+ROE = data.iloc[:,34:44].transpose()
+ROIC = data.iloc[:,44:54].transpose()
+ROA = data.iloc[:,54:64].transpose()
+Eq = data.iloc[:,64:74].transpose()
+
+datelist = pd.date_range(start='31/12/2009', periods=10, freq='Y')[::-1]
+sales = sales.set_index(datelist)
+sales = sales.sort_index()
+
+
+#Prophet performance 
+
+sales = df.iloc[:,4:14].transpose()
+datelist = pd.date_range(start='31/12/2009', periods=10, freq='Y')[::-1]
+sales = sales.set_index(datelist)
+sales = sales.sort_index()
+sales.reset_index(level=0, inplace=True)
+sales = sales.rename(columns={'index':'ds'})
+
+# choose a number of time steps
+model_proph = Prophet(interval_width=0.95)
+
+model_proph.fit(sales) #à partir de là, il faudrait avoir une colonne y par entreprise 
+
+m_forecast = model_proph.make_future_dataframe(periods=10, freq='Y')
+m_forecast = model_proph.predict(y1_forecast)
